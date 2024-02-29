@@ -24,3 +24,6 @@ api.key
 
 # Go workspace file
 go.work
+
+# GoLand
+.idea
