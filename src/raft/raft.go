@@ -72,8 +72,44 @@ type Raft struct {
 	voteFor     int
 	role        Role
 
-	electionStart   time.Time
-	electionTimeout time.Duration
+	electionStart   time.Time     // when the election starts
+	electionTimeout time.Duration // for random election time
+}
+
+func (rf *Raft) becomeLeaderLocked() {
+	if rf.role != Candidate {
+		LOG(rf.me, rf.currentTerm, DError, "Only Candidate can become Leader")
+		return
+	}
+
+	LOG(rf.me, rf.currentTerm, DLeader, "Candidate %d has become a Leader", rf.me)
+	rf.role = Leader
+}
+
+func (rf *Raft) becomeCandidateLocked() {
+	if rf.role == Leader {
+		LOG(rf.me, rf.currentTerm, DError, "Only Follower can become Candidate")
+		return
+	}
+
+	LOG(rf.me, rf.currentTerm, DVote, "%s become a Candidate for Term %d", rf.me, rf.currentTerm+1)
+	rf.currentTerm += 1
+	rf.role = Candidate
+	rf.voteFor = rf.me
+}
+
+func (rf *Raft) becomeFollowerLocked(term int) {
+	if term < rf.currentTerm {
+		LOG(rf.me, rf.currentTerm, DError, "Still in Term %d, get lower Term %d", rf.currentTerm, term)
+		return
+	}
+
+	LOG(rf.me, rf.currentTerm, DLog, "%s become a Follower, from Term %d to Term %d", rf.me, rf.currentTerm, term)
+	rf.role = Follower
+	if term > rf.currentTerm {
+		rf.voteFor = -1
+	}
+	rf.currentTerm = term
 }
 
 // return currentTerm and whether this server
