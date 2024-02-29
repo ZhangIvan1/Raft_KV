@@ -18,7 +18,6 @@ package raft
 //
 
 import (
-	//	"bytes"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -26,6 +25,14 @@ import (
 
 	//	"course/labgob"
 	"course/labrpc"
+)
+
+type Role string
+
+const (
+	Follower  Role = "Follower"
+	Leader    Role = "Leader"
+	Candidate Role = "Candidate"
 )
 
 // as each Raft peer becomes aware that successive log entries are
@@ -61,6 +68,12 @@ type Raft struct {
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 
+	currentTerm int
+	voteFor     int
+	role        Role
+
+	electionStart   time.Time
+	electionTimeout time.Duration
 }
 
 // return currentTerm and whether this server
@@ -124,12 +137,16 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 // field names must start with capital letters!
 type RequestVoteArgs struct {
 	// Your data here (PartA, PartB).
+	Term        int // candidate's term
+	CandidateId int // candidate requesting vote
 }
 
 // example RequestVote RPC reply structure.
 // field names must start with capital letters!
 type RequestVoteReply struct {
 	// Your data here (PartA).
+	Term        int // currentTerm, for candidate to update itself
+	VoteGranted int // true means candidate received vote
 }
 
 // example RequestVote RPC handler.
@@ -240,6 +257,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (PartA, PartB, PartC).
+	rf.currentTerm = 0
+	rf.voteFor = -1
+	rf.role = Follower
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
