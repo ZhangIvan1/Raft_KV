@@ -37,15 +37,17 @@ const (
 
 // Upper and lower bounds for election timeout
 const (
-	electionTimeoutMin   time.Duration = 250 * time.Millisecond
-	electionTimeoutMax   time.Duration = 400 * time.Millisecond
-	electionTimeoutRange int64         = int64(electionTimeoutMax - electionTimeoutMin)
+	electionTimeoutMin time.Duration = 250 * time.Millisecond
+	electionTimeoutMax time.Duration = 400 * time.Millisecond
+
+	replicateInterval time.Duration = 200 * time.Millisecond
 )
 
 // Reset the election timer when receiving the leader's log or voting.
 func (rf *Raft) resetElectionTimerLocked() {
 	rf.electionStart = time.Now()
-	rf.electionTimeout = electionTimeoutMin + time.Duration(rand.Int63()%electionTimeoutRange) // Random timeout
+	randRange := int64(electionTimeoutMax - electionTimeoutMin)
+	rf.electionTimeout = electionTimeoutMin + time.Duration(rand.Int63()%randRange) // Random timeout
 }
 
 // Check whether the current timeout
@@ -87,8 +89,8 @@ type Raft struct {
 	// state a Raft server must maintain.
 
 	currentTerm int
-	voteFor     int
 	role        Role
+	voteFor     int //-1 mean vote to none
 
 	electionStart   time.Time     // when the election starts
 	electionTimeout time.Duration // for random election time
@@ -111,8 +113,8 @@ func (rf *Raft) becomeCandidateLocked() {
 		return
 	}
 
-	LOG(rf.me, rf.currentTerm, DVote, "%s become a Candidate for Term %d", rf.me, rf.currentTerm+1)
-	rf.currentTerm += 1
+	LOG(rf.me, rf.currentTerm, DVote, "%d become a Candidate for Term %d", rf.me, rf.currentTerm+1)
+	rf.currentTerm++
 	rf.role = Candidate
 	rf.voteFor = rf.me
 }
@@ -123,7 +125,7 @@ func (rf *Raft) becomeFollowerLocked(term int) {
 		return
 	}
 
-	LOG(rf.me, rf.currentTerm, DLog, "%s become a Follower, from Term %d to Term %d", rf.me, rf.currentTerm, term)
+	LOG(rf.me, rf.currentTerm, DLog, "%d become a Follower, from Term %d to Term %d", rf.me, rf.currentTerm, term)
 	rf.role = Follower
 	if term > rf.currentTerm {
 		rf.voteFor = -1
@@ -216,11 +218,11 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// Construct return value
 	reply.Term = rf.currentTerm
+	reply.VoteGranted = false
 
 	// If the request term is smaller than current -> rejected
-	if rf.currentTerm > args.Term {
-		LOG(rf.me, rf.currentTerm, DVote, "%s reject vote, still in Term %d, get lower Term %d", rf.me, rf.currentTerm, args.Term)
-		reply.VoteGranted = false
+	if args.Term < rf.currentTerm {
+		LOG(rf.me, rf.currentTerm, DVote, "%d reject vote, still in Term %d, get lower Term %d", rf.me, rf.currentTerm, args.Term)
 		return
 	}
 
@@ -232,7 +234,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// If the peer has already voted
 	if rf.voteFor != -1 {
 		LOG(rf.me, rf.currentTerm, DVote, "Vote Request failed to %d, %d has already voted to %d", args.CandidateId, rf.me, rf.voteFor)
-		reply.VoteGranted = false
 		return
 	}
 
@@ -240,7 +241,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	reply.VoteGranted = true      // Said would not initiate new elections for the time being
 	rf.voteFor = args.CandidateId //
 	rf.resetElectionTimerLocked() // Reset election timer
-	LOG(rf.me, rf.currentTerm, DVote, "Raft %s vote to Raft %s in Term %d", rf.me, args.CandidateId, args.Term)
+	LOG(rf.me, rf.currentTerm, DVote, "Raft %d vote to Raft %d in Term %d", rf.me, args.CandidateId, args.Term)
 }
 
 // example code to send a RequestVote RPC to a server.
@@ -316,10 +317,15 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
+// Determine whether the current role and term have changed
+func (rf *Raft) contextLostLocked(role Role, term int) bool {
+	return !(rf.currentTerm == term && rf.role == role)
+}
+
 // The logic of elections
 
-func (rf *Raft) letElection(term int) bool {
-	gotVotes := 0
+func (rf *Raft) startElection(term int) {
+	votes := 0
 
 	// RPC
 	askForVote := func(peer int, args *RequestVoteArgs) {
@@ -349,54 +355,49 @@ func (rf *Raft) letElection(term int) bool {
 			return
 		}
 
-		// peer votes for self
+		// count votes
 		if reply.VoteGranted {
-			gotVotes++
-		}
-
-		// When get more than half of the votes
-		if gotVotes > len(rf.peers)>>2 {
-			rf.becomeLeaderLocked()
-			// Initiate heartbeat and log replication
-			go rf.replicationTicker(term)
+			votes++
+			LOG(rf.me, rf.currentTerm, DVote, "%d got %d votes in Term %d", rf.me, votes, rf.currentTerm)
+			// When get more than half of the votes
+			if votes > len(rf.peers)/2 {
+				rf.becomeLeaderLocked()
+				// Initiate heartbeat and log replication
+				go rf.replicationTicker(term)
+			}
 		}
 	}
 
 	rf.mu.Lock()
-	defer rf.mu.Lock()
+	defer rf.mu.Unlock()
 
 	// Terminate the election if the current role and term change
 	if rf.contextLostLocked(Candidate, term) {
 		LOG(rf.me, rf.currentTerm, DVote, "Lost context, abort RequestVoteReply in Term %d", rf.currentTerm)
-		return false
+		return
 	}
 
 	// Traverse all peers to request votes
 	for peer := 0; peer < len(rf.peers); peer++ {
 		// If self, vote self
 		if peer == rf.me {
-			gotVotes++
+			votes++
 			continue
 		}
 
 		// Set parameters for requesting vote
 		args := &RequestVoteArgs{
-			Term:        term,
+			Term:        rf.currentTerm,
 			CandidateId: rf.me,
 		}
 		go askForVote(peer, args)
 	}
 
-	return true
-}
-
-// Determine whether the current role and term have changed
-func (rf *Raft) contextLostLocked(role Role, term int) bool {
-	return !(rf.currentTerm == term && rf.role == role)
+	return
 }
 
 func (rf *Raft) electionTicker() {
-	for rf.killed() == false {
+	for !rf.killed() {
 
 		// Your code here (PartA)
 		// Check if a leader election should be started.
@@ -404,7 +405,7 @@ func (rf *Raft) electionTicker() {
 		if rf.role != Leader && rf.isElectionTimeoutLocked() {
 			// When a not-leader and the election timer times out, enters the election state.
 			rf.becomeCandidateLocked()
-			go rf.letElection(rf.currentTerm)
+			go rf.startElection(rf.currentTerm)
 		}
 		rf.mu.Unlock()
 
@@ -413,6 +414,102 @@ func (rf *Raft) electionTicker() {
 		ms := 50 + (rand.Int63() % 300)
 		time.Sleep(time.Duration(ms) * time.Millisecond)
 	}
+}
+
+// replicationTicker
+// only runnable in given term
+// |-> if no-log = heartbeat
+// |-> if has-log = log replication
+func (rf *Raft) replicationTicker(term int) {
+	for !rf.killed() {
+
+		ok := rf.startReplication(term)
+		if !ok {
+			break
+		}
+
+		// pause 200 ms
+		time.Sleep(replicateInterval)
+	}
+}
+
+type AppendEntriesArgs struct {
+	Term     int
+	LeaderId int
+}
+
+type AppendEntriesReply struct {
+	Term    int
+	Success bool
+}
+
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	//
+	if args.Term < rf.currentTerm {
+		LOG(rf.me, rf.currentTerm, DLog2, "Reject log, get lower term [%d < %d] from %d", args.Term, rf.currentTerm, args.LeaderId)
+		return
+	}
+
+	//
+	if args.Term >= rf.currentTerm {
+		rf.becomeFollowerLocked(args.Term)
+	}
+
+	rf.resetElectionTimerLocked()
+}
+
+func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}
+
+func (rf *Raft) startReplication(term int) bool {
+
+	replicationToPeer := func(peer int, args *AppendEntriesArgs) {
+
+		reply := &AppendEntriesReply{}
+		ok := rf.sendAppendEntries(peer, args, reply)
+
+		rf.mu.Lock()
+		defer rf.mu.Unlock()
+
+		// handle the response
+		if !ok {
+			LOG(rf.me, rf.currentTerm, DLog, "send Replication to %d failed", peer)
+			return
+		}
+
+		// If response term is greater, become followers
+		if reply.Term > rf.currentTerm {
+			rf.becomeFollowerLocked(reply.Term)
+			return
+		}
+	}
+
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	if rf.contextLostLocked(Leader, term) {
+		LOG(rf.me, rf.currentTerm, DLog, "Lost Leader[Term %d] to %d in Term %d", term, rf.me, rf.currentTerm)
+		return false
+	}
+
+	for peer := 0; peer < len(rf.peers); peer++ {
+		if peer == rf.me {
+			continue
+		}
+
+		args := &AppendEntriesArgs{
+			Term:     rf.currentTerm,
+			LeaderId: rf.me,
+		}
+		go replicationToPeer(peer, args)
+	}
+
+	return true
 }
 
 // the service or tester wants to create a Raft server. the ports

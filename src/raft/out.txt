@@ -1,0 +1,128 @@
+000003 T0000 VOTE S0 0 become a Candidate for Term 1
+Test (PartA): initial election ...
+000003 T0000 VOTE S1 1 become a Candidate for Term 1
+000003 T0000 VOTE S2 2 become a Candidate for Term 1
+000004 T0001 VOTE S2 Vote Request failed to 0, 2 has already voted to 2
+000004 T0001 VOTE S1 Vote Request failed to 0, 1 has already voted to 1
+000004 T0001 VOTE S0 Vote Request failed to 2, 0 has already voted to 0
+000005 T0001 VOTE S1 Vote Request failed to 2, 1 has already voted to 1
+000005 T0001 VOTE S2 Vote Request failed to 1, 2 has already voted to 2
+000005 T0001 VOTE S0 Vote Request failed to 1, 0 has already voted to 0
+001382 T0001 VOTE S2 2 become a Candidate for Term 2
+001383 T0001 LOG1 S1 1 become a Follower, from Term 1 to Term 2
+001383 T0002 VOTE S1 Raft 1 vote to Raft 2 in Term 2
+001383 T0002 VOTE S2 2 got 2 votes in Term 2
+001383 T0002 LEAD S2 Candidate 2 has become a Leader
+001384 T0001 LOG1 S0 0 become a Follower, from Term 1 to Term 2
+001384 T0002 VOTE S0 Raft 0 vote to Raft 2 in Term 2
+001384 T0002 VOTE S2 Lost context, abort RequestVoteReply in Term 2
+001384 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+001384 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+003397 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+003397 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+005403 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+005403 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+007406 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+007409 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+009418 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+009422 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+011425 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+011426 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+013435 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+013435 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+015438 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+015443 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+017448 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+017451 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+019455 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+019455 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+021457 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+021459 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+023473 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+023473 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+025484 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+025484 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+027490 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+027490 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+029502 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+029502 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+  ... Passed --   3.0  3   38    4600    0
+Test (PartA): election after network failure ...
+030401 T0000 VOTE S0 0 become a Candidate for Term 1
+030402 T0000 VOTE S1 1 become a Candidate for Term 1
+030404 T0001 VOTE S0 Vote Request failed to 1, 0 has already voted to 0
+030404 T0000 LOG1 S2 2 become a Follower, from Term 0 to Term 1
+030406 T0001 VOTE S2 Raft 2 vote to Raft 1 in Term 1
+030406 T0001 VOTE S2 Vote Request failed to 0, 2 has already voted to 1
+030406 T0001 VOTE S1 Vote Request failed to 0, 1 has already voted to 1
+030407 T0001 VOTE S1 1 got 2 votes in Term 1
+030407 T0001 LEAD S1 Candidate 1 has become a Leader
+030408 T0001 LOG1 S0 0 become a Follower, from Term 1 to Term 1
+030408 T0001 LOG1 S2 2 become a Follower, from Term 1 to Term 1
+032422 T0001 LOG1 S2 2 become a Follower, from Term 1 to Term 1
+032422 T0001 LOG1 S0 0 become a Follower, from Term 1 to Term 1
+034439 T0001 LOG1 S2 2 become a Follower, from Term 1 to Term 1
+034441 T0001 LOG1 S0 0 become a Follower, from Term 1 to Term 1
+038296 T0001 VOTE S2 2 become a Candidate for Term 2
+038301 T0001 LOG1 S0 0 become a Follower, from Term 1 to Term 2
+038302 T0002 VOTE S0 Raft 0 vote to Raft 2 in Term 2
+038303 T0002 VOTE S2 2 got 2 votes in Term 2
+038303 T0002 LEAD S2 Candidate 2 has become a Leader
+038306 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+040316 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+040457 T0002 LOG2 S2 Reject log, get lower term [1 < 2] from 1
+040458 T0002 LOG2 S0 Reject log, get lower term [1 < 2] from 1
+042321 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+042321 T0001 LOG1 S1 1 become a Follower, from Term 1 to Term 2
+042456 T0002 LOG1 S1 Lost Leader[Term 1] to 1 in Term 2
+044333 T0002 LOG1 S0 0 become a Follower, from Term 2 to Term 2
+044333 T0002 LOG1 S1 1 become a Follower, from Term 2 to Term 2
+045943 T0002 LOG1 S1 send Replication to 2 failed
+046132 T0002 DBUG S2 Ask vote to 1 failed
+047846 T0002 VOTE S0 0 become a Candidate for Term 3
+048124 T0002 VOTE S1 1 become a Candidate for Term 3
+049744 T0003 VOTE S0 0 become a Candidate for Term 4
+050295 T0003 VOTE S1 1 become a Candidate for Term 4
+050793 T0004 VOTE S0 0 become a Candidate for Term 5
+050907 T0005 DBUG S0 Ask vote to 2 failed
+051489 T0004 VOTE S1 1 become a Candidate for Term 5
+051514 T0005 DBUG S0 Ask vote to 1 failed
+051912 T0005 DBUG S1 Ask vote to 0 failed
+052052 T0005 VOTE S0 0 become a Candidate for Term 6
+052359 T0006 DBUG S0 Ask vote to 1 failed
+053355 T0005 VOTE S1 1 become a Candidate for Term 6
+054013 T0006 VOTE S0 0 become a Candidate for Term 7
+054872 T0006 VOTE S1 1 become a Candidate for Term 7
+055084 T0007 VOTE S0 0 become a Candidate for Term 8
+055086 T0008 DBUG S0 Ask vote to 2 failed
+055986 T0007 DBUG S1 Ask vote to 2 failed
+057397 T0007 VOTE S1 1 become a Candidate for Term 8
+057935 T0008 VOTE S0 0 become a Candidate for Term 9
+058067 T0002 LOG1 S2 send Replication to 1 failed
+060479 T0008 VOTE S1 1 become a Candidate for Term 9
+060610 T0009 DBUG S1 Ask vote to 2 failed
+060645 T0009 VOTE S0 0 become a Candidate for Term 10
+062276 T0002 LOG1 S2 send Replication to 0 failed
+062472 T0010 VOTE S0 0 become a Candidate for Term 11
+062746 T0009 DBUG S1 Ask vote to 0 failed
+062983 T0009 VOTE S1 1 become a Candidate for Term 10
+063927 T0010 VOTE S1 1 become a Candidate for Term 11
+063969 T0011 DBUG S1 Ask vote to 2 failed
+064056 T0011 DBUG S0 Ask vote to 2 failed
+064829 T0011 VOTE S0 0 become a Candidate for Term 12
+065124 T0011 DBUG S1 Ask vote to 2 failed
+065416 T0011 DBUG S1 Ask vote to 0 failed
+065584 T0011 VOTE S1 1 become a Candidate for Term 12
+066453 T0012 DBUG S0 Ask vote to 2 failed
+066924 T0012 VOTE S0 0 become a Candidate for Term 13
+066930 T0012 LOG1 S1 1 become a Follower, from Term 12 to Term 13
+066931 T0013 VOTE S1 Raft 1 vote to Raft 0 in Term 13
+066933 T0013 VOTE S0 0 got 2 votes in Term 13
+066933 T0013 LEAD S0 Candidate 0 has become a Leader
+066935 T0013 LOG1 S1 1 become a Follower, from Term 13 to Term 13
+067390 T0002 LOG1 S2 send Replication to 1 failed
+068093 T0013 DBUG S0 Ask vote to 1 failed
+068156 T0013 DBUG S1 Ask vote to 2 failed
+068174 T0013 DBUG S1 Ask vote to 0 failed
+068939 T0013 LOG1 S1 1 become a Follower, from Term 13 to Term 13
+069266 T0013 DBUG S0 Ask vote to 2 failed
