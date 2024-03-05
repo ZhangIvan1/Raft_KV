@@ -27,3 +27,6 @@ go.work
 
 # GoLand
 .idea
+
+
+out.txt
