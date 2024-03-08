@@ -81,13 +81,18 @@ type Raft struct {
 
 	log []LogEntry // log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
 
+	// for election loop
 	nextIndex  []int // for each server, index of the next log entry to send to that server (initialized to leader last log index+1)
 	matchIndex []int // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
 
-	commitIndex int
-
 	electionStart   time.Time     // when the election starts
 	electionTimeout time.Duration // for random election time
+
+	// for apply loop
+	commitIndex int // index of highest log entry known to be committed (initialized to 0, increases monotonically)
+	lastApplied int // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
+	applyCh     chan ApplyMsg
+	applyCond   *sync.Cond
 }
 
 // state transition
@@ -265,11 +270,18 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.nextIndex = make([]int, len(rf.peers))
 
+	// initialize apply
+	rf.applyCh = applyCh
+	rf.applyCond = sync.NewCond(&rf.mu)
+
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
 	// start ticker goroutine to start elections
 	go rf.electionTicker()
+
+	// start ticker goroutine to start apply
+	go rf.applicationTicker()
 
 	return rf
 }
