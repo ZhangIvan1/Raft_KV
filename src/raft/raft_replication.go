@@ -36,7 +36,7 @@ type AppendEntriesArgs struct {
 	PrevLogTerm  int        // term of prevLogIndex entry
 	Entries      []LogEntry // log entries to store(empty for heartbeat; mat send more than one for efficiency)
 
-	leaderCommit int // leader's commitIndex witch to update the follower's commitIndex
+	LeaderCommit int // leader's commitIndex witch to update the follower's commitIndex
 }
 
 type AppendEntriesReply struct {
@@ -81,9 +81,9 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Success = true
 
 	//handle the args.LeaderCommit
-	if args.leaderCommit > rf.commitIndex {
-		LOG(rf.me, rf.currentTerm, DApply, "follower update the commit index %d->%d", rf.commitIndex, args.leaderCommit)
-		rf.commitIndex = args.leaderCommit
+	if args.LeaderCommit > rf.commitIndex {
+		LOG(rf.me, rf.currentTerm, DApply, "follower update the commit index %d->%d", rf.commitIndex, args.LeaderCommit)
+		rf.commitIndex = args.LeaderCommit
 		rf.applyCond.Signal() // call application go on
 	}
 
@@ -106,6 +106,7 @@ func (rf *Raft) getMajorityIndexLocked() int {
 
 }
 
+// only valid in the given term
 func (rf *Raft) startReplication(term int) bool {
 
 	replicationToPeer := func(peer int, args *AppendEntriesArgs) {
@@ -125,6 +126,12 @@ func (rf *Raft) startReplication(term int) bool {
 		// If response term is greater, become followers
 		if reply.Term > rf.currentTerm {
 			rf.becomeFollowerLocked(reply.Term)
+			return
+		}
+
+		// check context lost
+		if rf.contextLostLocked(Leader, term) {
+			LOG(rf.me, rf.currentTerm, DLog, "Replication to peer%d, Context lost, T%d:Leader -> T%d:%d", peer, term, rf.currentTerm, rf.role)
 			return
 		}
 
@@ -182,7 +189,7 @@ func (rf *Raft) startReplication(term int) bool {
 			PrevLogTerm:  prevTerm,
 			//Entries:      rf.log[prevIdx+1:],
 			Entries:      append([]LogEntry(nil), rf.log[prevIdx+1:]...),
-			leaderCommit: rf.commitIndex,
+			LeaderCommit: rf.commitIndex,
 		}
 		go replicationToPeer(peer, args)
 	}

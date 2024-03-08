@@ -24,9 +24,11 @@ func (rf *Raft) isMoreUpToDateLocked(candidateIndex, candidateTerm int) bool {
 	lastIndex, lastTerm := logLen-1, rf.log[logLen-1].Term
 
 	LOG(rf.me, rf.currentTerm, DVote, "compare last log, local[%d]T%d, candidate[%d]T%d", lastIndex, lastTerm, candidateIndex, candidateTerm)
-	if lastIndex != candidateIndex {
+	// Term matter
+	if lastTerm != candidateTerm {
 		return lastTerm > candidateTerm
 	}
+	// then index
 	return lastIndex > candidateIndex
 }
 
