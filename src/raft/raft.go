@@ -79,6 +79,13 @@ type Raft struct {
 	role        Role
 	voteFor     int //-1 mean vote to none
 
+	log []LogEntry // log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
+
+	nextIndex  []int // for each server, index of the next log entry to send to that server (initialized to leader last log index+1)
+	matchIndex []int // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
+
+	commitIndex int
+
 	electionStart   time.Time     // when the election starts
 	electionTimeout time.Duration // for random election time
 }
@@ -92,6 +99,11 @@ func (rf *Raft) becomeLeaderLocked() {
 
 	LOG(rf.me, rf.currentTerm, DLeader, "Candidate %d has become a Leader", rf.me)
 	rf.role = Leader
+
+	for peer := 0; peer < len(rf.peers); peer++ {
+		rf.nextIndex[peer] = len(rf.log) // the next log that the leader wants to send
+		rf.matchIndex[peer] = 0          // new leader don’t know where followers match
+	}
 }
 
 func (rf *Raft) becomeCandidateLocked() {
@@ -246,6 +258,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.currentTerm = 0
 	rf.voteFor = -1
 	rf.role = Follower
+
+	rf.log = append(rf.log, LogEntry{}) // add an empty head node for reducing the corner check
+
+	// initialize the leader's view slice
+	rf.matchIndex = make([]int, len(rf.peers))
+	rf.nextIndex = make([]int, len(rf.peers))
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
