@@ -17,12 +17,28 @@ func (rf *Raft) isElectionTimeoutLocked() bool {
 	return time.Since(rf.electionStart) > rf.electionTimeout
 }
 
+// check if whether local log is newer than the log from the candidate
+func (rf *Raft) isMoreUpToDateLocked(candidateIndex, candidateTerm int) bool {
+	// get local index and term
+	logLen := len(rf.log)
+	lastIndex, lastTerm := logLen-1, rf.log[logLen-1].Term
+
+	LOG(rf.me, rf.currentTerm, DVote, "compare last log, local[%d]T%d, candidate[%d]T%d", lastIndex, lastTerm, candidateIndex, candidateTerm)
+	if lastIndex != candidateIndex {
+		return lastTerm > candidateTerm
+	}
+	return lastIndex > candidateIndex
+}
+
 // example RequestVote RPC arguments structure.
 // field names must start with capital letters!
 type RequestVoteArgs struct {
 	// Your data here (PartA, PartB).
 	Term        int // candidate's term
 	CandidateId int // candidate requesting vote
+
+	LastLogIndex int // index of candidate's last log entry
+	LastLogTerm  int // term of candidate's last log entry
 }
 
 // example RequestVote RPC reply structure.
@@ -56,8 +72,14 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	}
 
 	// If the peer has already voted
-	if rf.voteFor != -1 {
+	if rf.voteFor != -1 && rf.voteFor != args.CandidateId {
 		LOG(rf.me, rf.currentTerm, DVote, "Vote Request failed to %d, %d has already voted to %d", args.CandidateId, rf.me, rf.voteFor)
+		return
+	}
+
+	// check who has the latest log
+	if rf.isMoreUpToDateLocked(args.LastLogIndex, args.LastLogTerm) {
+		LOG(rf.me, rf.currentTerm, DVote, "%d reject vote, candidate has old log", rf.me)
 		return
 	}
 
@@ -155,6 +177,7 @@ func (rf *Raft) startElection(term int) {
 	}
 
 	// Traverse all peers to request votes
+	logLen := len(rf.log)
 	for peer := 0; peer < len(rf.peers); peer++ {
 		// If self, vote self
 		if peer == rf.me {
@@ -166,6 +189,9 @@ func (rf *Raft) startElection(term int) {
 		args := &RequestVoteArgs{
 			Term:        rf.currentTerm,
 			CandidateId: rf.me,
+
+			LastLogIndex: logLen - 1,
+			LastLogTerm:  rf.log[logLen-1].Term,
 		}
 		go askForVote(peer, args)
 	}
