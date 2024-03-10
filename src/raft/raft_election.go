@@ -88,6 +88,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Return to voting commitment
 	reply.VoteGranted = true      // Said would not initiate new elections for the time being
 	rf.voteFor = args.CandidateId //
+	rf.persistLocked()
 	rf.resetElectionTimerLocked() // Reset election timer
 	LOG(rf.me, rf.currentTerm, DVote, "Raft %d vote to Raft %d in Term %d", rf.me, args.CandidateId, args.Term)
 }

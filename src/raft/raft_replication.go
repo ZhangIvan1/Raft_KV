@@ -77,6 +77,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// log matched, accept
 	// insert new logs after the matching point and throw unmatched logs
 	rf.log = append(rf.log[:args.PrevLogIndex+1], args.Entries...)
+	rf.persistLocked()
 	LOG(rf.me, rf.currentTerm, DLog2, "Follower %d accept logs: (%d, %d]", rf.me, args.PrevLogIndex, args.PrevLogIndex+len(args.Entries))
 	reply.Success = true
 
