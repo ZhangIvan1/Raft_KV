@@ -20,8 +20,8 @@ func (rf *Raft) isElectionTimeoutLocked() bool {
 // check if whether local log is newer than the log from the candidate
 func (rf *Raft) isMoreUpToDateLocked(candidateIndex, candidateTerm int) bool {
 	// get local index and term
-	logLen := len(rf.log)
-	lastIndex, lastTerm := logLen-1, rf.log[logLen-1].Term
+	//logLen := rf.log.size()
+	lastIndex, lastTerm := rf.log.last()
 
 	LOG(rf.me, rf.currentTerm, DVote, "compare last log, local[%d]T%d, candidate[%d]T%d", lastIndex, lastTerm, candidateIndex, candidateTerm)
 	// Term matter
@@ -180,7 +180,8 @@ func (rf *Raft) startElection(term int) {
 	}
 
 	// Traverse all peers to request votes
-	logLen := len(rf.log)
+	//logLen := len(rf.log)
+	lastIndex, lastTerm := rf.log.last()
 	for peer := 0; peer < len(rf.peers); peer++ {
 		// If self, vote self
 		if peer == rf.me {
@@ -193,8 +194,8 @@ func (rf *Raft) startElection(term int) {
 			Term:        rf.currentTerm,
 			CandidateId: rf.me,
 
-			LastLogIndex: logLen - 1,
-			LastLogTerm:  rf.log[logLen-1].Term,
+			LastLogIndex: lastIndex,
+			LastLogTerm:  lastTerm,
 		}
 		go askForVote(peer, args)
 	}

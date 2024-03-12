@@ -48,19 +48,6 @@ const (
 	InvalidTerm  int = 0
 )
 
-// to find out the first log in a term
-func (rf *Raft) firstLogFor(term int) int {
-	for i, entry := range rf.log {
-		if entry.Term == term {
-			return i
-		} else if entry.Term > term {
-			break
-		}
-	}
-	// no log in the term in this server
-	return InvalidIndex
-}
-
 // as each Raft peer becomes aware that successive log entries are
 // committed, the peer should send an ApplyMsg to the service (or
 // tester) on the same server, via the applyCh passed to Make(). set
@@ -98,7 +85,8 @@ type Raft struct {
 	role        Role
 	voteFor     int //-1 mean vote to none
 
-	log []LogEntry // log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
+	//log []LogEntry // log entries; each entry contains command for state machine, and term when entry was received by leader (first index is 1)
+	log *RaftLog // enable log compressed
 
 	// for election loop
 	nextIndex  []int // for each server, index of the next log entry to send to that server (initialized to leader last log index+1)
@@ -125,8 +113,9 @@ func (rf *Raft) becomeLeaderLocked() {
 	rf.role = Leader
 
 	for peer := 0; peer < len(rf.peers); peer++ {
-		rf.nextIndex[peer] = len(rf.log) // the next log that the leader wants to send
-		rf.matchIndex[peer] = 0          // new leader don’t know where followers match
+		//rf.nextIndex[peer] = len(rf.log) // the next log that the leader wants to send
+		rf.nextIndex[peer] = rf.log.size() // enable log compressed
+		rf.matchIndex[peer] = 0            // new leader don’t know where followers match
 	}
 }
 
@@ -184,6 +173,19 @@ func (rf *Raft) GetState() (int, bool) {
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (PartD).
 
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	LOG(rf.me, rf.currentTerm, DSnap, "snap on %d", index)
+
+	// if the gaven index already inside snapshot or haven't commit
+	if index <= rf.log.snapLastIndex || index > rf.commitIndex {
+		LOG(rf.me, rf.commitIndex, DSnap, "Could not snapshot beyond [%d, %d]", rf.log.snapLastIndex+1, rf.commitIndex)
+		return
+	}
+
+	rf.log.doSnapshot(index, snapshot)
+	rf.persistLocked()
 }
 
 // the service using Raft (e.g. a k/v server) wants to start
@@ -213,15 +215,15 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 
 	//build leader's own log
-	rf.log = append(rf.log, LogEntry{
+	rf.log.append(LogEntry{
 		CommandValid: true,
 		Command:      command,
 		Term:         rf.currentTerm,
 	})
-	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", len(rf.log)-1, rf.currentTerm)
+	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", rf.log.size()-1, rf.currentTerm)
 	rf.persistLocked()
 
-	return len(rf.log) - 1, rf.currentTerm, true
+	return rf.log.size() - 1, rf.currentTerm, true
 }
 
 // the tester doesn't halt goroutines created by Raft after each test,
@@ -269,7 +271,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.voteFor = -1
 	rf.role = Follower
 
-	rf.log = append(rf.log, LogEntry{}) // add an empty head node for reducing the corner check
+	//rf.log = append(rf.log, LogEntry{}) // add an empty head node for reducing the corner check
+	rf.log = NewLog(InvalidIndex, InvalidIndex, nil, nil)
 
 	// initialize the leader's view slice
 	rf.matchIndex = make([]int, len(rf.peers))
