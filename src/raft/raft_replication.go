@@ -42,6 +42,9 @@ type AppendEntriesArgs struct {
 type AppendEntriesReply struct {
 	Term    int  // currentTerm, for leader to update itself
 	Success bool // true if follower contained entry matching prevLogIndex and prevLogTerm
+
+	ConfilictIndex int
+	ConfilictTerm  int
 }
 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
@@ -62,15 +65,24 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.becomeFollowerLocked(args.Term)
 	}
 
+	// after receive an acceptable we should reset election timer for respect to leader
+	defer rf.resetElectionTimerLocked()
+
 	// the log should match in same <index, term>
 	// if prevLog not matched
 	if args.PrevLogIndex >= len(rf.log) {
 		LOG(rf.me, rf.currentTerm, DLog2, "Reject log from %d, Follower %d log too short, Len:%d<=Perv:%d", args.LeaderId, rf.me, len(rf.log), args.PrevLogIndex)
+		// return the follower log index and term
+		reply.ConfilictIndex = len(rf.log)
+		reply.ConfilictTerm = InvalidTerm
 		return
 	}
 	// if log in difference term
 	if rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
 		LOG(rf.me, rf.currentTerm, DLog2, "Reject log from %d, Prev log not match, [%d]:T%d!=[%d]:T%d", args.LeaderId, args.PrevLogIndex, rf.log[args.PrevLogIndex], args.PrevLogIndex)
+		// return the first log in leader term if follower has
+		reply.ConfilictTerm = rf.log[args.PrevLogIndex].Term
+		reply.ConfilictIndex = rf.firstLogFor(reply.ConfilictTerm)
 		return
 	}
 
@@ -139,15 +151,37 @@ func (rf *Raft) startReplication(term int) bool {
 		// handle the reply
 		// mismatch, append failed
 		if !reply.Success {
-			// go back an index
-			idx := rf.nextIndex[peer] - 1
-			term := rf.log[idx].Term
-			// search for the match log of the peer
-			for idx > 0 && rf.log[idx].Term == term {
-				idx--
+
+			//// go back an index
+			//idx := rf.nextIndex[peer] - 1
+			//term := rf.log[idx].Term
+			//// search for the match log of the peer
+			//for idx > 0 && rf.log[idx].Term == term {
+			//	idx--
+			//}
+			//rf.nextIndex[peer] = idx + 1
+			//LOG(rf.me, rf.currentTerm, DLog, "Lost match in %d, Update next=%d", args.PrevLogIndex, rf.nextIndex)
+
+			prevIndex := rf.nextIndex[peer]
+			// if follower do not have leader's term (too short)
+			if reply.ConfilictTerm == InvalidTerm {
+				rf.nextIndex[peer] = reply.ConfilictIndex
+			} else {
+				// find if leader have follower's term
+				firstTermIndex := rf.firstLogFor(reply.ConfilictTerm)
+				//if do have
+				if firstTermIndex != InvalidIndex {
+					// match to the first log of term
+					rf.nextIndex[peer] = firstTermIndex + 1
+				} else { // if not have
+					// jump forward of follower's (the ending of the last term +1)
+					rf.nextIndex[peer] = reply.ConfilictIndex
+				}
 			}
-			rf.nextIndex[peer] = idx + 1
-			LOG(rf.me, rf.currentTerm, DLog, "Lost match in %d, Update next=%d", args.PrevLogIndex, rf.nextIndex)
+			// keep nextIndex reducing
+			if rf.nextIndex[peer] > prevIndex {
+				rf.nextIndex[peer] = prevIndex
+			}
 			return
 		}
 
@@ -158,7 +192,7 @@ func (rf *Raft) startReplication(term int) bool {
 
 		// compute the new commitIndex
 		majorityMatched := rf.getMajorityIndexLocked()
-		if majorityMatched > rf.commitIndex {
+		if majorityMatched > rf.commitIndex && rf.log[majorityMatched].Term == rf.currentTerm {
 			LOG(rf.me, rf.currentTerm, DApply, "Leader update the commit index %d->%d", rf.commitIndex, majorityMatched)
 			rf.commitIndex = majorityMatched
 			rf.applyCond.Signal() // call application go on

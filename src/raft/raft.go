@@ -42,6 +42,25 @@ const (
 	replicateInterval time.Duration = 70 * time.Millisecond
 )
 
+//
+const (
+	InvalidIndex int = 0
+	InvalidTerm  int = 0
+)
+
+// to find out the first log in a term
+func (rf *Raft) firstLogFor(term int) int {
+	for i, entry := range rf.log {
+		if entry.Term == term {
+			return i
+		} else if entry.Term > term {
+			break
+		}
+	}
+	// no log in the term in this server
+	return InvalidIndex
+}
+
 // as each Raft peer becomes aware that successive log entries are
 // committed, the peer should send an ApplyMsg to the service (or
 // tester) on the same server, via the applyCh passed to Make(). set
