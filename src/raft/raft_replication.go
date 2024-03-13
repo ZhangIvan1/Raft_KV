@@ -165,7 +165,7 @@ func (rf *Raft) startReplication(term int) bool {
 			//term := rf.log[idx].Term
 			//// search for the match log of the peer
 			//for idx > 0 && rf.log[idx].Term == term {
-			//	idx--
+			// idx--
 			//}
 			//rf.nextIndex[peer] = idx + 1
 			//LOG(rf.me, rf.currentTerm, DLog, "Lost match in %d, Update next=%d", args.PrevLogIndex, rf.nextIndex)
@@ -190,6 +190,15 @@ func (rf *Raft) startReplication(term int) bool {
 			if rf.nextIndex[peer] > prevIndex {
 				rf.nextIndex[peer] = prevIndex
 			}
+
+			nextPrevIndex := rf.nextIndex[peer] - 1
+			nextPrevTerm := InvalidTerm
+			if nextPrevIndex >= rf.log.snapLastIndex {
+				nextPrevTerm = rf.log.at(nextPrevIndex).Term
+			}
+			LOG(rf.me, rf.currentTerm, DLog, "send snapshot to %d, Not matched at Prev=[%d]T%d, Try next Prev=[%d]T%d",
+				peer, args.PrevLogIndex, args.PrevLogTerm, nextPrevIndex, nextPrevTerm)
+			LOG(rf.me, rf.currentTerm, DDebug, "send snapshot to %d, Leader log=%v", peer, rf.log.String())
 			return
 		}
 
@@ -244,7 +253,8 @@ func (rf *Raft) startReplication(term int) bool {
 			PrevLogIndex: prevIdx,
 			PrevLogTerm:  prevTerm,
 			//Entries:      rf.log[prevIdx+1:],
-			Entries:      append([]LogEntry(nil), rf.log.tail(prevIdx+1)...),
+			//Entries:      append([]LogEntry(nil), rf.log.tail(prevIdx+1)...),
+			Entries:      rf.log.tail(prevIdx + 1),
 			LeaderCommit: rf.commitIndex,
 		}
 		LOG(rf.me, rf.currentTerm, DDebug, "to s%d, Append , Args=%v", peer, args.String())

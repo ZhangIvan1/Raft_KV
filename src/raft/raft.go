@@ -100,7 +100,7 @@ type Raft struct {
 	lastApplied int // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
 	applyCh     chan ApplyMsg
 	applyCond   *sync.Cond
-	snapPending bool //
+	snapPending bool
 }
 
 // state transition

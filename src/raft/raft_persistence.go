@@ -75,8 +75,8 @@ func (rf *Raft) readPersist(data []byte) {
 
 	//var log []LogEntry
 	//if err := d.Decode(&log); err != nil {
-	//	LOG(rf.me, rf.currentTerm, DPersist, "Read log error!!")
-	//	return
+	// LOG(rf.me, rf.currentTerm, DPersist, "Read log error!!")
+	// return
 	//}
 	//rf.log = log
 	if err := rf.log.readPersist(d); err != nil {

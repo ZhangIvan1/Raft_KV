@@ -17,7 +17,7 @@ type RaftLog struct {
 }
 
 // NewLog make a new RaftLog
-func NewLog(snapLastIndex, snapLastTerm int, snapshot []byte, entires []LogEntry) *RaftLog {
+func NewLog(snapLastIndex, snapLastTerm int, snapshot []byte, entries []LogEntry) *RaftLog {
 	rl := &RaftLog{
 		snapLastIndex: snapLastIndex,
 		snapLastTerm:  snapLastTerm,
@@ -29,7 +29,7 @@ func NewLog(snapLastIndex, snapLastTerm int, snapshot []byte, entires []LogEntry
 		Term: snapLastTerm,
 	})
 	// appending the real logs
-	rl.tailLog = append(rl.tailLog, entires...)
+	rl.tailLog = append(rl.tailLog, entries...)
 
 	return rl
 }
@@ -117,12 +117,16 @@ func (rl *RaftLog) appendFrom(LogicalPrevIndex int, entries []LogEntry) {
 
 // doing snapshot which is from the application layer
 func (rl *RaftLog) doSnapshot(index int, snapshot []byte) {
+	if index <= rl.snapLastIndex {
+		return
+	}
+
 	// located the true index of the log in tailLog
 	idx := rl.logicalIndexToPhysical(index)
 
 	// update raftLog
-	rl.snapLastTerm = rl.tailLog[idx].Term
 	rl.snapLastIndex = index
+	rl.snapLastTerm = rl.tailLog[idx].Term
 	rl.snapshot = snapshot
 
 	// make a new log array to release old memory space

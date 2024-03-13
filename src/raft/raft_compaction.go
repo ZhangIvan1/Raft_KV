@@ -16,9 +16,15 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 
 	LOG(rf.me, rf.currentTerm, DSnap, "snap on %d", index)
 
-	// if the gaven index already inside snapshot or haven't commit
-	if index <= rf.log.snapLastIndex || index > rf.commitIndex {
-		LOG(rf.me, rf.commitIndex, DSnap, "Could not snapshot beyond [%d, %d]", rf.log.snapLastIndex+1, rf.commitIndex)
+	// if the gaven index or haven't commit
+	if index > rf.commitIndex {
+		LOG(rf.me, rf.currentTerm, DSnap, "Couldn't snapshot before CommitIdx: %d>%d", index, rf.commitIndex)
+		return
+	}
+
+	// if the gaven index already inside snapshot
+	if index <= rf.log.snapLastIndex {
+		LOG(rf.me, rf.commitIndex, DSnap, "Already snapshot in [%d, %d]", rf.log.snapLastIndex+1, rf.commitIndex)
 		return
 	}
 
@@ -52,7 +58,7 @@ func (reply *InstallSnapshotReply) String() string {
 	return fmt.Sprintf("T%d", reply.Term)
 }
 
-func (rf *Raft) installSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) {
+func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
