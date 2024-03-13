@@ -7,25 +7,47 @@ func (rf *Raft) applicationTicker() {
 		rf.mu.Lock()
 		rf.applyCond.Wait() //release until signal from leader
 		entries := make([]LogEntry, 0)
-		for i := rf.lastApplied + 1; i <= rf.commitIndex; i++ {
-			entries = append(entries, rf.log.at(i))
+		snapPendingApply := rf.snapPending
+		if !snapPendingApply {
+			for i := rf.lastApplied + 1; i <= rf.commitIndex; i++ {
+				entries = append(entries, rf.log.at(i))
+			}
 		}
 		rf.mu.Unlock()
 
-		// apply all msg
-		for i, entry := range entries {
-			rf.applyCh <- ApplyMsg{
-				CommandValid: entry.CommandValid,
-				Command:      entry.Command,
-				CommandIndex: rf.lastApplied + 1 + i,
-			}
+		if !snapPendingApply {
+			// apply all msg
+			for i, entry := range entries {
+				rf.applyCh <- ApplyMsg{
+					CommandValid: entry.CommandValid,
+					Command:      entry.Command,
+					CommandIndex: rf.lastApplied + 1 + i,
+				}
 
+			}
+		} else {
+			// apply snapshot
+			rf.applyCh <- ApplyMsg{
+				SnapshotValid: true,
+				Snapshot:      rf.log.snapshot,
+				SnapshotTerm:  rf.log.snapLastTerm,
+				SnapshotIndex: rf.log.snapLastIndex,
+			}
 		}
 
 		// update lastApplied
 		rf.mu.Lock()
-		LOG(rf.me, rf.currentTerm, DApply, "Apply logs for [%d, %d]", rf.lastApplied+1, rf.lastApplied+len(entries))
-		rf.lastApplied += len(entries)
+		if !snapPendingApply {
+			LOG(rf.me, rf.currentTerm, DApply, "Apply logs for [%d, %d]", rf.lastApplied+1, rf.lastApplied+len(entries))
+			rf.lastApplied += len(entries)
+		} else {
+			LOG(rf.me, rf.currentTerm, DApply, "Apply snapshot for [0, %d]", rf.log.snapLastIndex)
+			rf.lastApplied += rf.log.snapLastIndex
+			if rf.commitIndex < rf.lastApplied {
+				rf.commitIndex = rf.lastApplied
+			}
+			rf.snapPending = false
+		}
 		rf.mu.Unlock()
 	}
 }

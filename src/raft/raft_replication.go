@@ -224,6 +224,19 @@ func (rf *Raft) startReplication(term int) bool {
 		}
 
 		prevIdx := rf.nextIndex[peer] - 1
+		// if target log has been persisted
+		if prevIdx < rf.log.snapLastIndex {
+			args := &InstallSnapshotArgs{
+				Term:              rf.currentTerm,
+				LeaderId:          rf.me,
+				LastIncludedIndex: rf.log.snapLastIndex,
+				LastIncludedTerm:  rf.log.snapLastTerm,
+				Snapshot:          rf.log.snapshot,
+			}
+			LOG(rf.me, rf.currentTerm, DDebug, "to s%d, Send Snapshot , Args=%v", peer, args.String())
+			go rf.installToPeer(peer, term, args)
+			continue
+		}
 		prevTerm := rf.log.at(prevIdx).Term
 		args := &AppendEntriesArgs{
 			Term:         rf.currentTerm,

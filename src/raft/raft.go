@@ -100,6 +100,7 @@ type Raft struct {
 	lastApplied int // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
 	applyCh     chan ApplyMsg
 	applyCond   *sync.Cond
+	snapPending bool //
 }
 
 // state transition
@@ -164,28 +165,6 @@ func (rf *Raft) GetState() (int, bool) {
 	defer rf.mu.Unlock()
 	//return term, isleader
 	return rf.currentTerm, rf.role == Leader
-}
-
-// the service says it has created a snapshot that has
-// all info up to and including index. this means the
-// service no longer needs the log through (and including)
-// that index. Raft should now trim its log as much as possible.
-func (rf *Raft) Snapshot(index int, snapshot []byte) {
-	// Your code here (PartD).
-
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	LOG(rf.me, rf.currentTerm, DSnap, "snap on %d", index)
-
-	// if the gaven index already inside snapshot or haven't commit
-	if index <= rf.log.snapLastIndex || index > rf.commitIndex {
-		LOG(rf.me, rf.commitIndex, DSnap, "Could not snapshot beyond [%d, %d]", rf.log.snapLastIndex+1, rf.commitIndex)
-		return
-	}
-
-	rf.log.doSnapshot(index, snapshot)
-	rf.persistLocked()
 }
 
 // the service using Raft (e.g. a k/v server) wants to start
@@ -283,6 +262,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.applyCond = sync.NewCond(&rf.mu)
 	rf.commitIndex = 0
 	rf.lastApplied = 0
+	rf.snapPending = false
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())

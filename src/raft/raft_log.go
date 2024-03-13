@@ -115,9 +115,8 @@ func (rl *RaftLog) appendFrom(LogicalPrevIndex int, entries []LogEntry) {
 	rl.tailLog = append(rl.tailLog[:rl.logicalIndexToPhysical(LogicalPrevIndex)+1], entries...)
 }
 
-//
+// doing snapshot which is from the application layer
 func (rl *RaftLog) doSnapshot(index int, snapshot []byte) {
-
 	// located the true index of the log in tailLog
 	idx := rl.logicalIndexToPhysical(index)
 
@@ -132,6 +131,21 @@ func (rl *RaftLog) doSnapshot(index int, snapshot []byte) {
 		Term: rl.snapLastTerm,
 	})
 	newLog = append(newLog, rl.tailLog[idx+1:]...)
+	rl.tailLog = newLog
+}
+
+// installing snapshot which is from the leader
+func (rl RaftLog) installSnapshot(index, term int, snapshot []byte) {
+	// update raftLog
+	rl.snapLastTerm = term
+	rl.snapLastIndex = index
+	rl.snapshot = snapshot
+
+	// make a new log array to release old memory space
+	newLog := make([]LogEntry, 0, 1)
+	newLog = append(newLog, LogEntry{
+		Term: rl.snapLastTerm,
+	})
 	rl.tailLog = newLog
 }
 
