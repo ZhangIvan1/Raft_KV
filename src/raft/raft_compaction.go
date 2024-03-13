@@ -32,7 +32,8 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	rf.persistLocked()
 }
 
-//
+// InstallSnapshot RPC arguments structure.
+// field names must start with capital letters!
 type InstallSnapshotArgs struct {
 	Term     int
 	LeaderId int
@@ -43,21 +44,23 @@ type InstallSnapshotArgs struct {
 	Snapshot []byte
 }
 
-//
+// covert InstallSnapshotArgs to string
 func (args *InstallSnapshotArgs) String() string {
 	return fmt.Sprintf("Leader-%d, T%d, Last: [%d]T%d", args.LeaderId, args.Term, args.LastIncludedIndex, args.LastIncludedTerm)
 }
 
-//
+// InstallSnapshot RPC reply structure.
+// field names must start with capital letters!
 type InstallSnapshotReply struct {
 	Term int
 }
 
-//
+// covert InstallSnapshotReply to string
 func (reply *InstallSnapshotReply) String() string {
 	return fmt.Sprintf("T%d", reply.Term)
 }
 
+// the InstallSnapshot RPC handler.
 func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -82,19 +85,28 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	}
 
 	// receive the snapshot (install to memory/persist/application)
+	LOG(rf.me, rf.currentTerm, DSnap, "install the snapshot from %d, include [0,%d]T%d", args.LeaderId, args.LastIncludedIndex, args.Term)
 	rf.log.installSnapshot(args.LastIncludedIndex, args.LastIncludedTerm, args.Snapshot)
+	//LOG(rf.me, rf.currentTerm, DSnap, "installed the snapshot from %d, include [0,%d]T%d", args.LeaderId, rf.log.snapLastIndex, rf.log.snapLastTerm)
 	rf.persistLocked()
 	rf.snapPending = true // tell applier to apply the snapshot
 	rf.applyCond.Signal()
 }
 
-//
+// the code to send a InstallSnapshot RPC to a server.
+// server is the index of the target server in rf.peers[].
+// expects RPC arguments in args.
+// fills in *reply with RPC reply, so caller should
+// pass &reply.
+// the types of the args and reply passed to Call() must be
+// the same as the types of the arguments declared in the
+// handler function (including whether they are pointers).
 func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapshotArgs, reply *InstallSnapshotReply) bool {
 	ok := rf.peers[server].Call("Raft.InstallSnapshot", args, reply)
 	return ok
 }
 
-//
+// RPC
 func (rf *Raft) installToPeer(peer, term int, args *InstallSnapshotArgs) {
 	reply := &InstallSnapshotReply{}
 	ok := rf.sendInstallSnapshot(peer, args, reply)
@@ -107,13 +119,13 @@ func (rf *Raft) installToPeer(peer, term int, args *InstallSnapshotArgs) {
 	}
 	LOG(rf.me, rf.currentTerm, DLog, "send install to %d, install snapshot, reply=%v", peer, reply.String())
 
-	//
+	// If response term is greater, become followers
 	if reply.Term > rf.currentTerm {
 		rf.becomeFollowerLocked(reply.Term)
 		return
 	}
 
-	//
+	// Check if the context has changed
 	if rf.contextLostLocked(Leader, term) {
 		LOG(rf.me, rf.currentTerm, DLog, "")
 		return

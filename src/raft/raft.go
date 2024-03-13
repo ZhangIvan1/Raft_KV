@@ -42,7 +42,7 @@ const (
 	replicateInterval time.Duration = 70 * time.Millisecond
 )
 
-//
+// Invalid Index and Term (for the empty head node or just mean Invalid)
 const (
 	InvalidIndex int = 0
 	InvalidTerm  int = 0
@@ -100,7 +100,7 @@ type Raft struct {
 	lastApplied int // index of highest log entry applied to state machine (initialized to 0, increases monotonically)
 	applyCh     chan ApplyMsg
 	applyCond   *sync.Cond
-	snapPending bool
+	snapPending bool // if there have a snapshot need to be applied first
 }
 
 // state transition

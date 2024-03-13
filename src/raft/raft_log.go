@@ -63,8 +63,10 @@ func (rl *RaftLog) persistLocked(e *labgob.LabEncoder) {
 	e.Encode(rl.tailLog)
 }
 
-// index covert
+// return the size of hole logs
 func (rl *RaftLog) size() int { return rl.snapLastIndex + len(rl.tailLog) }
+
+// index covert
 func (rl *RaftLog) logicalIndexToPhysical(logicalIndex int) int {
 	// if logical index fall beyond [snapLastIndex, size()-1]
 	if logicalIndex < rl.snapLastIndex || logicalIndex > rl.size()-1 {
@@ -139,7 +141,7 @@ func (rl *RaftLog) doSnapshot(index int, snapshot []byte) {
 }
 
 // installing snapshot which is from the leader
-func (rl RaftLog) installSnapshot(index, term int, snapshot []byte) {
+func (rl *RaftLog) installSnapshot(index, term int, snapshot []byte) {
 	// update raftLog
 	rl.snapLastTerm = term
 	rl.snapLastIndex = index

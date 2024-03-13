@@ -203,6 +203,7 @@ func (rf *Raft) startElection(term int) {
 	return
 }
 
+//
 func (rf *Raft) electionTicker() {
 	for !rf.killed() {
 

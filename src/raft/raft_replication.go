@@ -44,8 +44,8 @@ type AppendEntriesReply struct {
 	Term    int  // currentTerm, for leader to update itself
 	Success bool // true if follower contained entry matching prevLogIndex and prevLogTerm
 
-	ConfilictIndex int
-	ConfilictTerm  int
+	ConfilictIndex int //
+	ConfilictTerm  int //
 }
 
 // convert AppendEntriesArgs to String
@@ -55,6 +55,7 @@ func (args *AppendEntriesArgs) String() string {
 		args.PrevLogIndex, args.PrevLogIndex+len(args.Entries), args.LeaderCommit)
 }
 
+// example AppendEntries RPC handler.
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -111,6 +112,14 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.resetElectionTimerLocked()
 }
 
+// the code to send a AppendEntries RPC to a server.
+// server is the index of the target server in rf.peers[].
+// expects RPC arguments in args.
+// fills in *reply with RPC reply, so caller should
+// pass &reply.
+// the types of the args and reply passed to Call() must be
+// the same as the types of the arguments declared in the
+// handler function (including whether they are pointers).
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
 	return ok
@@ -160,7 +169,7 @@ func (rf *Raft) startReplication(term int) bool {
 		// mismatch, append failed
 		if !reply.Success {
 
-			//// go back an index
+			//// go back an indexd
 			//idx := rf.nextIndex[peer] - 1
 			//term := rf.log[idx].Term
 			//// search for the match log of the peer

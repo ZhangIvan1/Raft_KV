@@ -23,6 +23,9 @@ func (rf *Raft) applicationTicker() {
 			for i := start; i <= end; i++ {
 				entries = append(entries, rf.log.at(i))
 			}
+			LOG(rf.me, rf.currentTerm, DApply, "applying from %v to %v [normal]", start, end)
+		} else {
+			LOG(rf.me, rf.currentTerm, DApply, "applying from %v to %v [snap]", rf.lastApplied+1, rf.log.snapLastIndex)
 		}
 		rf.mu.Unlock()
 
@@ -34,7 +37,6 @@ func (rf *Raft) applicationTicker() {
 					Command:      entry.Command,
 					CommandIndex: rf.lastApplied + 1 + i,
 				}
-
 			}
 		} else {
 			// apply snapshot
@@ -53,7 +55,7 @@ func (rf *Raft) applicationTicker() {
 			rf.lastApplied += len(entries)
 		} else {
 			LOG(rf.me, rf.currentTerm, DApply, "Apply snapshot for [0, %d]", rf.log.snapLastIndex)
-			rf.lastApplied += rf.log.snapLastIndex
+			rf.lastApplied = rf.log.snapLastIndex
 			if rf.commitIndex < rf.lastApplied {
 				rf.commitIndex = rf.lastApplied
 			}
